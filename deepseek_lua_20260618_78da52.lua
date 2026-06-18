@@ -1149,9 +1149,7 @@ secKillerAbilities:Toggle({ Title="c00lkidd — Dash Turn",     Type="Checkbox",
 secKillerAbilities:Toggle({ Title="Noli — Void Rush Control", Type="Checkbox", Flag="noliVoidRushOn",Default=noliVoidRushOn,Callback=function(on) noliVoidRushOn=on; if not on then noliStop() end end })
 
 ------------------------------------------------------------------------
-------------------------------------------------------------------------
-------------------------------------------------------------------------
--- TAB: VISUAL (ESP) - FULLY FIXED
+-- TAB: VISUAL (ESP) - FIXED VERSION
 ------------------------------------------------------------------------
 local tabVisual = win:Tab({ Title = "Visual", Icon = "eye", IconColor = Color3.fromHex("#7DD3FC"), ShowTabTitle = false })
 local secESP    = tabVisual:Section({ Title = "ESP", Opened = true })
@@ -1168,11 +1166,11 @@ local ESP_CONFIG = {
     Buildings   = false,
     
     -- Colors (Rayfield style)
-    KillerColor    = Color3.fromRGB(100, 0, 0),      -- Dark Red
-    SurvivorColor  = Color3.fromRGB(255, 215, 0),    -- Gold
-    GeneratorColor = Color3.fromRGB(255, 200, 50),   -- Yellow
-    ItemColor      = Color3.fromRGB(0, 200, 255),    -- Cyan
-    BuildingColor  = Color3.fromRGB(128, 0, 255),    -- Purple
+    KillerColor    = Color3.fromRGB(100, 0, 0),
+    SurvivorColor  = Color3.fromRGB(255, 215, 0),
+    GeneratorColor = Color3.fromRGB(255, 200, 50),
+    ItemColor      = Color3.fromRGB(0, 200, 255),
+    BuildingColor  = Color3.fromRGB(128, 0, 255),
     
     MaxDistance    = 2000,
 }
@@ -1197,18 +1195,18 @@ local EngineState = {
 -- ============================================================================
 
 local function GetHealthColor(pct)
-    if pct >= 70 then return Color3.fromRGB(255, 215, 0) end    -- Gold
-    if pct >= 40 then return Color3.fromRGB(255, 165, 0) end    -- Orange
-    if pct >= 15 then return Color3.fromRGB(255, 100, 0) end    -- Dark Orange
-    return Color3.fromRGB(255, 0, 0)                            -- Red
+    if pct >= 70 then return Color3.fromRGB(255, 215, 0) end
+    if pct >= 40 then return Color3.fromRGB(255, 165, 0) end
+    if pct >= 15 then return Color3.fromRGB(255, 100, 0) end
+    return Color3.fromRGB(255, 0, 0)
 end
 
 local function GetItemColor(name)
     local lowered = name:lower()
     if lowered:find("medkit") then
-        return Color3.fromRGB(0, 200, 255)    -- Cyan
+        return Color3.fromRGB(0, 200, 255)
     elseif lowered:find("bloxycola") then
-        return Color3.fromRGB(255, 150, 0)    -- Orange
+        return Color3.fromRGB(255, 150, 0)
     end
     return Color3.fromRGB(0, 200, 255)
 end
@@ -1277,7 +1275,8 @@ local function RemoveESP(object)
     local cache = EngineState.Pool[object]
     if cache then
         pcall(function()
-            if cache.Highlight then cache.Highlight:Destroy() end            if cache.Billboard then cache.Billboard:Destroy() end
+            if cache.Highlight then cache.Highlight:Destroy() end
+            if cache.Billboard then cache.Billboard:Destroy() end
         end)
         EngineState.Pool[object] = nil
     end
@@ -1474,7 +1473,6 @@ local function ScanAll()
         UpdateGeneratorCount()
         for _, gen in ipairs(mc:GetChildren()) do
             if gen.Name == "Generator" then
-                -- Skip if already has a billboard to prevent duplicates
                 if not gen:FindFirstChild("ESP_Generator") then
                     AddESP(gen, "Generator", _storedColors.GeneratorColor or ESP_CONFIG.GeneratorColor, false)
                 end
@@ -1642,7 +1640,6 @@ local secColors = tabVisual:Section({ Title = "ESP Colors", Opened = false })
 secColors:Colorpicker({ Title="Killer Color", Default=ESP_CONFIG.KillerColor, Transparency=0,
     Callback=function(c) 
         _storedColors.KillerColor = c
-        -- Update existing ESP
         for obj, data in pairs(EngineState.Pool) do
             if data.Tag == "Killer" then
                 if data.TextLabel then data.TextLabel.TextColor3 = c end
@@ -3108,7 +3105,7 @@ local aiState = {
     wpIndex     = 1,
     moveConn    = nil,
     lastMovePos = nil,
-    stuckCheck  = { pos = nil, time = 0 },  -- stuck detection
+    stuckCheck  = { pos = nil, time = 0 },
 }
 
 -----------------------------------------------------------------------
@@ -3159,7 +3156,6 @@ local function aiFireSlash()
         abilityName = "Punch"
         bufStr = "\x03\x05\x00\x00\x00Punch"
     else
-        -- Slasher, JohnDoe, 1x1x1x1, Nosferatu, Guest666, etc.
         abilityName = "Slash"
         bufStr = "\x03\x05\x00\x00\x00Slash"
     end
@@ -3173,7 +3169,7 @@ local function aiFireSlash()
 end
 
 -----------------------------------------------------------------------
--- KILLER AI — Movement Loop (NEVER STOPS)
+-- KILLER AI — Movement Loop
 -----------------------------------------------------------------------
 local function aiStartMove()
     if aiState.moveConn then aiState.moveConn:Disconnect() end
@@ -3188,7 +3184,6 @@ local function aiStartMove()
         local targetHRP = aiState.target.root
         if not targetHRP then return end
 
-        -- If very close, discard stale waypoints and track live position directly
         local directDist = (targetHRP.Position - hrp.Position).Magnitude
         if directDist <= 8 then
             aiState.waypoints   = {}
@@ -3198,7 +3193,6 @@ local function aiStartMove()
             return
         end
 
-        -- Follow waypoints
         if aiState.wpIndex <= #aiState.waypoints then
             local wp = aiState.waypoints[aiState.wpIndex]
             if (hrp.Position - wp.Position).Magnitude < 5 then
@@ -3208,7 +3202,6 @@ local function aiStartMove()
             return
         end
 
-        -- Direct chase with smooth lerp (ALWAYS ACTIVE, never stops)
         aiState.lastMovePos = aiState.lastMovePos or hrp.Position
         local targetPos = aiPredictPosition(targetHRP, aiCfg.predScale)
         aiState.lastMovePos = aiState.lastMovePos:Lerp(targetPos, 0.15)
@@ -3217,7 +3210,7 @@ local function aiStartMove()
 end
 
 -----------------------------------------------------------------------
--- KILLER AI — Main Loop (NEVER DIES)
+-- KILLER AI — Main Loop
 -----------------------------------------------------------------------
 local function aiKillerLoop()
     aiStartMove()
@@ -3232,7 +3225,6 @@ local function aiKillerLoop()
             task.wait(3); continue
         end
 
-        -- Stuck detection: if we haven't moved >2 studs in 1.5s, force repath
         local now = tick()
         if not aiState.stuckCheck.pos then
             aiState.stuckCheck.pos  = hrp.Position
@@ -3242,17 +3234,15 @@ local function aiKillerLoop()
             if moved < 2 and aiState.target and aiState.target.root then
                 local targetHRP = aiState.target.root
                 if (targetHRP.Position - hrp.Position).Magnitude > 8 then
-                    -- Stuck — clear waypoints to force a fresh path next tick
                     aiState.waypoints = {}
                     aiState.wpIndex   = 1
-                    aiState.lastPath  = 0  -- force immediate repath
+                    aiState.lastPath  = 0
                 end
             end
             aiState.stuckCheck.pos  = hrp.Position
             aiState.stuckCheck.time = now
         end
 
-        -- Retarget only if current target is dead/gone
         if not aiState.target or not aiState.target.root
             or aiState.target.humanoid.Health <= 0 then
             aiState.target    = aiGetNearest()
@@ -3263,7 +3253,6 @@ local function aiKillerLoop()
         if not aiState.target then continue end
         local targetHRP = aiState.target.root
 
-        -- Attack
         local dist = (targetHRP.Position - hrp.Position).Magnitude
         if dist <= aiCfg.slashRange then
             if tick() - aiState.lastSlash > aiCfg.slashCooldown then
@@ -3272,7 +3261,6 @@ local function aiKillerLoop()
             end
         end
 
-        -- Pathfinding (safe, refreshes every interval)
         if tick() - aiState.lastPath > aiCfg.pathInterval then
             aiState.lastPath = tick()
             local path = PathfindingService:CreatePath({
@@ -3285,12 +3273,11 @@ local function aiKillerLoop()
                 aiState.waypoints = path:GetWaypoints()
                 aiState.wpIndex   = 1
             else
-                aiState.waypoints = {} -- fallback: direct chase via Heartbeat
+                aiState.waypoints = {}
             end
         end
     end
 
-    -- Cleanup on stop
     if aiState.moveConn then aiState.moveConn:Disconnect(); aiState.moveConn = nil end
 end
 
@@ -3339,13 +3326,11 @@ secAICtrl:Button({
 })
 
 -- =========================================================================
--- GUEST 1337 SECTION - WITH FIXED AUTO BLOCK (NO EXTRA RANGE)
+-- GUEST 1337 SECTION - With Auto Block
 -- =========================================================================
 pcall(function()
 local tabGuest1337 = win:Tab({ Title = "Guest 1337", Icon = "shield", IconColor = Color3.fromHex("#FFD700"), ShowTabTitle = false })
 
--- GUEST1337 — Auto Block & Combat
-------------------------------------------------------------------------
 local sec_015 = tabGuest1337:Section({ Title = "Auto Block & Combat", Opened = true })
 
 -- Settings
@@ -3371,13 +3356,12 @@ local combatS = {
     aimPunchDuration = 0.5,
     hbTargetSize    = Vector3.new(4.50, 6.00, 7.50),
     hbMargin        = 0.05,
-    autoBlockOn      = false,           -- MAIN AUTO BLOCK TOGGLE
-    autoBlockMode    = "Hitbox",        -- "Hitbox", "Sounds", "Animations"
-    autoBlockAudioOn = false,           -- kept for backward compat but controlled by mode
-    autoBlockAnimOn  = false,           -- kept for backward compat but controlled by mode
+    autoBlockOn      = false,
+    autoBlockMode    = "Hitbox",
+    autoBlockAudioOn = false,
+    autoBlockAnimOn  = false,
 }
 
--- Block anim IDs for HDT detection
 local BLOCK_ANIMS = {
     ["72722244508749"]=true,["96959123077498"]=true,["95802026624883"]=true,
     ["100926346851492"]=true,["120748030255574"]=true,
@@ -3654,7 +3638,6 @@ local function combatAttemptSoundBlock(sound, preId)
     if not char:IsDescendantOf(kf) then return end
 
     local dist = (hrp.Position - myRoot.Position).Magnitude
-    -- FIX: Use exact detection range, NO extra +3
     if dist > combatS.detectionRange then return end
     if not combatIsFacing(myRoot, hrp, char.Name) then return end
 
@@ -3692,33 +3675,28 @@ local function combatHookSound(sound)
     if sound.IsPlaying then combatAttemptSoundBlock(sound, preId) end
 end
 
--- FIXED: combatSetupSoundHooks now scans both killers folder AND workspace
 local function combatSetupSoundHooks()
     local kf = combatGetKillersFolder()
     if not kf then return end
     
-    -- Scan existing sounds in killers folder
     for _, d in ipairs(kf:GetDescendants()) do
         if d:IsA("Sound") then 
             pcall(combatHookSound, d) 
         end
     end
     
-    -- Watch for new sounds in killers folder
     kf.DescendantAdded:Connect(function(d)
         if d:IsA("Sound") then 
             pcall(combatHookSound, d) 
         end
     end)
     
-    -- Also scan workspace for sounds that might be outside killers folder
     for _, d in ipairs(svc.WS:GetDescendants()) do
         if d:IsA("Sound") and d:IsDescendantOf(combatGetKillersFolder()) then
             pcall(combatHookSound, d)
         end
     end
     
-    -- Watch workspace for new killer sounds
     svc.WS.DescendantAdded:Connect(function(d)
         if d:IsA("Sound") and d:IsDescendantOf(combatGetKillersFolder()) then
             pcall(combatHookSound, d)
@@ -3737,18 +3715,16 @@ local TRIGGER_ANIMS = {
     ["129976080405072"]=true,["121293883585738"]=true,["81639435858902"]=true,
     ["137314737492715"]=true,["92173139187970"]=true, ["122709416391"]=true,
     ["879895330952"]=true,
-    -- Added from M1 Animation Map
-    ["98031287364865"]=true, ["105614318732282"]=true, -- John Doe Punch
-    ["127324570265084"]=true,                           -- Slasher Slash
-    ["86710781315432"]=true, ["100725497418533"]=true,["106538427162796"]=true, -- Noli Stab
-    ["133398613783505"]=true,["87259391926321"]=true,  -- c00lkidd Punch
-    ["88451353906104"]=true,                            -- Nosferatu Slash
-    ["135853087227453"]=true,                           -- Guest 666 Slash
+    ["98031287364865"]=true, ["105614318732282"]=true,
+    ["127324570265084"]=true,
+    ["86710781315432"]=true, ["100725497418533"]=true,["106538427162796"]=true,
+    ["133398613783505"]=true,["87259391926321"]=true,
+    ["88451353906104"]=true,
+    ["135853087227453"]=true,
 }
 
 local combatAnimBlockConn = nil
 
--- FIXED: combatSetupAnimBlock now uses Heartbeat instead of RenderStepped
 local function combatSetupAnimBlock()
     if combatAnimBlockConn then 
         combatAnimBlockConn:Disconnect() 
@@ -3773,7 +3749,6 @@ local function combatSetupAnimBlock()
             if not khrp or not khum then continue end
             
             local dist = (khrp.Position - myRoot.Position).Magnitude
-            -- FIX: Use exact detection range, NO extra
             if dist > combatS.detectionRange then continue end
             
             if not combatIsFacing(myRoot, khrp, killer.Name) then continue end
@@ -3814,11 +3789,6 @@ local function combatSetupAnimBlock()
             end
         end
     end)
-end
-
--- FIX: combatGetDynamicRadius NOW RETURNS EXACT RANGE (NO PING EXTRA)
-local function combatGetDynamicRadius()
-    return combatS.detectionRange  -- EXACT range, no ping-based +3/+5/+10
 end
 
 local function combatTryBlockFromHitbox(hb)
@@ -3862,7 +3832,6 @@ local function combatTryBlockFromHitbox(hb)
 
     local myRoot = combatCachedHRP; if not myRoot then return end
     local dist = (hb.Position - myRoot.Position).Magnitude
-    -- FIX: Use exact detection range, NO extra from ping
     if dist > combatS.detectionRange then return end
 
     local hrp = killerModel:FindFirstChild("HumanoidRootPart")
@@ -3909,10 +3878,8 @@ end
 local combatHBChildConn    = nil
 local combatHBHeartbeatConn = nil
 
--- FIXED: heartbeat loop uses EXACT detection range
 combatSetupSoundWatcher = function()
     task.spawn(function()
-        -- Initialize sound hooks first
         combatSetupSoundHooks()
         
         local folder = svc.WS:WaitForChild("Hitboxes", 10)
@@ -3932,7 +3899,6 @@ combatSetupSoundWatcher = function()
             if not combatS.autoBlockOn then return end
             if combatS.autoBlockMode ~= "Hitbox" then return end
             local myRoot = combatCachedHRP; if not myRoot then return end
-            -- FIX: Use EXACT detection range, NO extra
             local radius = combatS.detectionRange
             for _, hb in ipairs(folder:GetChildren()) do
                 if hb:IsA("BasePart") then
@@ -4223,7 +4189,6 @@ if lp.Character then
 end
 
 -- UI Elements
--- MAIN AUTO BLOCK TOGGLE AT THE TOP
 sec_015:Toggle({ 
     Title = "🔒 Enable Auto Block", 
     Flag = "combatAutoBlockMain", 
@@ -4241,7 +4206,6 @@ sec_015:Toggle({
     Type = "Checkbox"
 })
 
--- Auto Block Mode Dropdown (Hitbox, Sounds, Animations)
 sec_015:Dropdown({ 
     Title = "Auto Block Mode", 
     Flag = "combatAutoBlockMode", 
@@ -4320,8 +4284,7 @@ sec_019:Slider({ Title = "Punch Prediction", Flag = "combatPunchPred", Step = 0.
 sec_019:Slider({ Title = "Aim Duration (s)", Flag = "combatAimDur", Step = 0.05,
     Value = { Min = 0.1, Max = 2.0, Default = combatS.aimPunchDuration },
     Callback = function(v) combatS.aimPunchDuration = v end })
-end) -- END OF GUEST 1337 PCALL
-
+end)
 
 -- =========================================================================
 -- TAB: TWO-TIME (Dagger / Flank)
@@ -4552,7 +4515,7 @@ hookCrouch()
 
 -- Circle heartbeat
 svc.Run.Heartbeat:Connect(function() ttUpdateCircles() end)
-end) -- end Two-Time pcall
+end)
 
 -- TAB: INTERFACE
 ------------------------------------------------------------------------
@@ -4676,7 +4639,7 @@ secOldDevs:Paragraph({
     Title = "Special Thanks",
     Desc  = "Special thanks to glov/v1pr for the script.",
 })
-end) -- end Config Share + Credits pcall
+end)
 
 print("TEST 2")
 print("Hutao ready")
