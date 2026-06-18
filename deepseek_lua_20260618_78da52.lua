@@ -584,7 +584,7 @@ do
 
     function ChatLogger.addMessage(sender, message, messageType)
         pcall(function()
-            if not chatScrollFrame or not chatContainer then ChatLogger.createUI(); if not chatScrollFrame then return end
+            if not chatScrollFrame or not chatContainer then ChatLogger.createUI(); if not chatScrollFrame then return end end
             msgOrder = msgOrder + 1
             local nameColor = COLORS.Player
             local textColor = Color3.fromRGB(240, 240, 240)
@@ -1149,7 +1149,9 @@ secKillerAbilities:Toggle({ Title="c00lkidd — Dash Turn",     Type="Checkbox",
 secKillerAbilities:Toggle({ Title="Noli — Void Rush Control", Type="Checkbox", Flag="noliVoidRushOn",Default=noliVoidRushOn,Callback=function(on) noliVoidRushOn=on; if not on then noliStop() end end })
 
 ------------------------------------------------------------------------
--- TAB: VISUAL (ESP) - FIXED VERSION
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+-- TAB: VISUAL (ESP)
 ------------------------------------------------------------------------
 local tabVisual = win:Tab({ Title = "Visual", Icon = "eye", IconColor = Color3.fromHex("#7DD3FC"), ShowTabTitle = false })
 local secESP    = tabVisual:Section({ Title = "ESP", Opened = true })
@@ -1166,22 +1168,13 @@ local ESP_CONFIG = {
     Buildings   = false,
     
     -- Colors (Rayfield style)
-    KillerColor    = Color3.fromRGB(100, 0, 0),
-    SurvivorColor  = Color3.fromRGB(255, 215, 0),
-    GeneratorColor = Color3.fromRGB(255, 200, 50),
-    ItemColor      = Color3.fromRGB(0, 200, 255),
-    BuildingColor  = Color3.fromRGB(128, 0, 255),
+    KillerColor    = Color3.fromRGB(100, 0, 0),      -- Dark Red
+    SurvivorColor  = Color3.fromRGB(255, 215, 0),    -- Gold
+    GeneratorColor = Color3.fromRGB(255, 200, 50),   -- Yellow
+    ItemColor      = Color3.fromRGB(0, 200, 255),    -- Cyan
+    BuildingColor  = Color3.fromRGB(128, 0, 255),    -- Purple
     
     MaxDistance    = 2000,
-}
-
--- Store actual color values for color pickers
-local _storedColors = {
-    KillerColor    = ESP_CONFIG.KillerColor,
-    SurvivorColor  = ESP_CONFIG.SurvivorColor,
-    GeneratorColor = ESP_CONFIG.GeneratorColor,
-    ItemColor      = ESP_CONFIG.ItemColor,
-    BuildingColor  = ESP_CONFIG.BuildingColor,
 }
 
 -- State Storage
@@ -1195,18 +1188,18 @@ local EngineState = {
 -- ============================================================================
 
 local function GetHealthColor(pct)
-    if pct >= 70 then return Color3.fromRGB(255, 215, 0) end
-    if pct >= 40 then return Color3.fromRGB(255, 165, 0) end
-    if pct >= 15 then return Color3.fromRGB(255, 100, 0) end
-    return Color3.fromRGB(255, 0, 0)
+    if pct >= 70 then return Color3.fromRGB(255, 215, 0) end    -- Gold
+    if pct >= 40 then return Color3.fromRGB(255, 165, 0) end    -- Orange
+    if pct >= 15 then return Color3.fromRGB(255, 100, 0) end    -- Dark Orange
+    return Color3.fromRGB(255, 0, 0)                            -- Red
 end
 
 local function GetItemColor(name)
     local lowered = name:lower()
     if lowered:find("medkit") then
-        return Color3.fromRGB(0, 200, 255)
+        return Color3.fromRGB(0, 200, 255)    -- Cyan
     elseif lowered:find("bloxycola") then
-        return Color3.fromRGB(255, 150, 0)
+        return Color3.fromRGB(255, 150, 0)    -- Orange
     end
     return Color3.fromRGB(0, 200, 255)
 end
@@ -1255,7 +1248,7 @@ end
 local function GetGeneratorText(obj)
     local progress = GeneratorProgress[obj] or 0
     local completed = math.floor(progress / 25)
-    return string.format("%s [%d/4]", obj.Name, completed)
+    return string.format("Generator [%d/4]", completed)
 end
 
 -- ============================================================================
@@ -1283,16 +1276,14 @@ local function RemoveESP(object)
 end
 
 -- ============================================================================
--- CORE ALLOCATION ENGINE
+-- CORE ALLOCATION ENGINE - FIXED: Only attaches to main model, not body parts
 -- ============================================================================
 
 local function AddESP(object, tag, defaultColor, isCharacter)
     if not object or not object.Parent then return end
-    
-    -- Check if this object already has ESP before proceeding
     if EngineState.Pool[object] then return end
 
-    -- Characters must be Models
+    -- Characters must be Models; items/buildings can also be BaseParts
     if isCharacter then
         if not object:IsA("Model") then return end
     else
@@ -1302,27 +1293,26 @@ local function AddESP(object, tag, defaultColor, isCharacter)
     -- Skip if it's the local player's character
     if object == lp.Character then return end
 
-    -- Find root part
+    -- Find root part - for characters, ONLY use HumanoidRootPart to avoid billboard
+    -- adorning a random body part (Torso, Left Arm, etc.) before HRP is replicated
     local root
     if isCharacter then
+        -- Wait up to 3s for HumanoidRootPart to replicate
         local deadline = tick() + 3
         repeat
             root = object:FindFirstChild("HumanoidRootPart")
             if not root then task.wait(0.1) end
         until root or tick() > deadline or not object.Parent
-        if not root then return end
+        if not root then return end -- character never fully loaded, skip
     else
         root = object.PrimaryPart
             or object:FindFirstChildWhichIsA("BasePart")
             or object
     end
 
-    -- Re-check pool after the yield
+    -- Re-check pool after the yield (another call may have beaten us)
     if EngineState.Pool[object] then return end
     if not object or not object.Parent then return end
-
-    -- Check for existing BillboardGui to prevent duplicates
-    if object:FindFirstChild("ESP_" .. tag) then return end
 
     EngineState.Connections[object] = {}
 
@@ -1369,23 +1359,25 @@ local function AddESP(object, tag, defaultColor, isCharacter)
                 local pct = (hum.Health / mHp) * 100
                 data.HPPercent = math.floor(pct + 0.5)
                 
+                -- Format based on type
                 if data.Tag == "Killer" then
                     data.TextLabel.Text = string.format("[KILLER] %s [%d%%]", object.Name, data.HPPercent)
-                    data.TextLabel.TextColor3 = _storedColors.KillerColor or ESP_CONFIG.KillerColor
+                    data.TextLabel.TextColor3 = ESP_CONFIG.KillerColor
                 else
+                    -- Survivors - Gold with health color
                     local healthColor = GetHealthColor(pct)
                     data.TextLabel.Text = string.format("%s [%d%%]", object.Name, data.HPPercent)
                     data.TextLabel.TextColor3 = healthColor
-                    data.BaseColor = _storedColors.SurvivorColor or ESP_CONFIG.SurvivorColor
+                    data.BaseColor = ESP_CONFIG.SurvivorColor
                 end
                 
                 if data.Highlight then
                     if data.Tag == "Killer" then
-                        data.Highlight.FillColor = _storedColors.KillerColor or ESP_CONFIG.KillerColor
-                        data.Highlight.OutlineColor = _storedColors.KillerColor or ESP_CONFIG.KillerColor
+                        data.Highlight.FillColor = ESP_CONFIG.KillerColor
+                        data.Highlight.OutlineColor = ESP_CONFIG.KillerColor
                     else
-                        data.Highlight.FillColor = _storedColors.SurvivorColor or ESP_CONFIG.SurvivorColor
-                        data.Highlight.OutlineColor = _storedColors.SurvivorColor or ESP_CONFIG.SurvivorColor
+                        data.Highlight.FillColor = ESP_CONFIG.SurvivorColor
+                        data.Highlight.OutlineColor = ESP_CONFIG.SurvivorColor
                     end
                 end
             end
@@ -1406,8 +1398,8 @@ local function AddESP(object, tag, defaultColor, isCharacter)
             else
                 data.TextLabel.Text = GetGeneratorText(object)
             end
-            data.TextLabel.TextColor3 = _storedColors.GeneratorColor or ESP_CONFIG.GeneratorColor
-            data.BaseColor = _storedColors.GeneratorColor or ESP_CONFIG.GeneratorColor
+            data.TextLabel.TextColor3 = ESP_CONFIG.GeneratorColor
+            data.BaseColor = ESP_CONFIG.GeneratorColor
         else
             -- Items and Buildings
             data.TextLabel.Text = object.Name
@@ -1435,7 +1427,7 @@ local function AddESP(object, tag, defaultColor, isCharacter)
 end
 
 -- ============================================================================
--- SCAN FUNCTIONS
+-- SCAN FUNCTIONS - FIXED: Only scans Models, ignores body parts
 -- ============================================================================
 
 local function ScanAll()
@@ -1449,7 +1441,7 @@ local function ScanAll()
         if f then
             for _, entity in ipairs(f:GetChildren()) do
                 if entity:IsA("Model") and entity ~= lp.Character then 
-                    AddESP(entity, "Killer", _storedColors.KillerColor or ESP_CONFIG.KillerColor, true) 
+                    AddESP(entity, "Killer", ESP_CONFIG.KillerColor, true) 
                 end
             end
         end
@@ -1460,7 +1452,7 @@ local function ScanAll()
         if f then
             for _, entity in ipairs(f:GetChildren()) do
                 if entity:IsA("Model") and entity ~= lp.Character then 
-                    AddESP(entity, "Survivor", _storedColors.SurvivorColor or ESP_CONFIG.SurvivorColor, true) 
+                    AddESP(entity, "Survivor", ESP_CONFIG.SurvivorColor, true) 
                 end
             end
         end
@@ -1473,8 +1465,9 @@ local function ScanAll()
         UpdateGeneratorCount()
         for _, gen in ipairs(mc:GetChildren()) do
             if gen.Name == "Generator" then
-                if not gen:FindFirstChild("ESP_Generator") then
-                    AddESP(gen, "Generator", _storedColors.GeneratorColor or ESP_CONFIG.GeneratorColor, false)
+                -- Skip if already tracked in pool OR already has a billboard
+                if not EngineState.Pool[gen] and not gen:FindFirstChild("ESP_Generator") then
+                    AddESP(gen, "Generator", ESP_CONFIG.GeneratorColor, false)
                 end
             end
         end
@@ -1482,7 +1475,11 @@ local function ScanAll()
 
     if ESP_CONFIG.Items then
         for _, obj in ipairs(svc.WS:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name == "BloxyCola" or obj.Name == "Medkit") then
+            -- Match common item names (case-insensitive fallback via string patterns)
+            local isItem = (obj.Name == "BloxyCola" or obj.Name == "Medkit"
+                or obj.Name == "BloxyCola_Model" or obj.Name == "Medkit_Model"
+                or obj.Name:lower():find("bloxycola") or obj.Name:lower():find("medkit"))
+            if obj:IsA("BasePart") and isItem then
                 local held = false
                 for _, player in ipairs(svc.Players:GetPlayers()) do
                     if player.Character and obj:IsDescendantOf(player.Character) then
@@ -1497,10 +1494,15 @@ local function ScanAll()
                 end
                 if not held then
                     local parent = obj.Parent
-                    if parent and parent:IsA("Model") and not parent:FindFirstChild("ESP_Item") then
-                        AddESP(parent, "Item", _storedColors.ItemColor or ESP_CONFIG.ItemColor, false)
-                    elseif not obj:FindFirstChild("ESP_Item") then
-                        AddESP(obj, "Item", _storedColors.ItemColor or ESP_CONFIG.ItemColor, false)
+                    if parent and parent:IsA("Model") then
+                        -- Use pool guard; also check billboard tag
+                        if not EngineState.Pool[parent] and not parent:FindFirstChild("ESP_Item") then
+                            AddESP(parent, "Item", GetItemColor(obj.Name), false)
+                        end
+                    else
+                        if not EngineState.Pool[obj] and not obj:FindFirstChild("ESP_Item") then
+                            AddESP(obj, "Item", GetItemColor(obj.Name), false)
+                        end
                     end
                 end
             end
@@ -1513,8 +1515,8 @@ local function ScanAll()
             local buildingNames = {"BuildermanSentry", "SubspaceTripmine", "BuildermanDispenser"}
             for _, obj in ipairs(ig:GetChildren()) do
                 for _, name in ipairs(buildingNames) do
-                    if obj.Name == name and not obj:FindFirstChild("ESP_Building") then
-                        AddESP(obj, "Building", _storedColors.BuildingColor or ESP_CONFIG.BuildingColor, false)
+                    if obj.Name == name then
+                        AddESP(obj, "Building", ESP_CONFIG.BuildingColor, false)
                         break
                     end
                 end
@@ -1535,48 +1537,52 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- WATCH FOR NEW OBJECTS
+-- WATCH FOR NEW OBJECTS - FIXED: Only watches Models
 -- ============================================================================
 
+-- Debounce table: prevents multiple simultaneous AddESP calls for the same model
+-- when its body parts replicate one-by-one (each fires DescendantAdded)
 local _espWatchDebounce = {}
 
 svc.WS.DescendantAdded:Connect(function(obj)
+    -- Only process models directly; body parts (BasePart, etc.) are ignored here
     if not obj:IsA("Model") then return end
 
+    -- Debounce per-object so concurrent fires don't race into AddESP together
     if _espWatchDebounce[obj] then return end
     _espWatchDebounce[obj] = true
 
     task.spawn(function()
-        task.wait(0.5)
+        task.wait(0.5) -- let the model finish replicating before we inspect it
         _espWatchDebounce[obj] = nil
 
         if not obj or not obj.Parent then return end
 
         if ESP_CONFIG.Killers then
             local f = GetTeamFolderESP("Killers")
-            if f and obj:IsDescendantOf(f) and obj ~= lp.Character and not obj:FindFirstChild("ESP_Killer") then
-                AddESP(obj, "Killer", _storedColors.KillerColor or ESP_CONFIG.KillerColor, true)
+            if f and obj:IsDescendantOf(f) and obj ~= lp.Character then
+                AddESP(obj, "Killer", ESP_CONFIG.KillerColor, true)
             end
         end
 
         if ESP_CONFIG.Survivors then
             local f = GetTeamFolderESP("Survivors")
-            if f and obj:IsDescendantOf(f) and obj ~= lp.Character and not obj:FindFirstChild("ESP_Survivor") then
-                AddESP(obj, "Survivor", _storedColors.SurvivorColor or ESP_CONFIG.SurvivorColor, true)
+            if f and obj:IsDescendantOf(f) and obj ~= lp.Character then
+                AddESP(obj, "Survivor", ESP_CONFIG.SurvivorColor, true)
             end
         end
 
         if ESP_CONFIG.Generators and obj.Name == "Generator" then
-            if not obj:FindFirstChild("ESP_Generator") then
-                AddESP(obj, "Generator", _storedColors.GeneratorColor or ESP_CONFIG.GeneratorColor, false)
+            if not EngineState.Pool[obj] and not obj:FindFirstChild("ESP_Generator") then
+                AddESP(obj, "Generator", ESP_CONFIG.GeneratorColor, false)
             end
         end
 
         if ESP_CONFIG.Buildings then
             local buildingNames = {"BuildermanSentry", "SubspaceTripmine", "BuildermanDispenser"}
             for _, name in ipairs(buildingNames) do
-                if obj.Name == name and not obj:FindFirstChild("ESP_Building") then
-                    AddESP(obj, "Building", _storedColors.BuildingColor or ESP_CONFIG.BuildingColor, false)
+                if obj.Name == name then
+                    AddESP(obj, "Building", ESP_CONFIG.BuildingColor, false)
                     break
                 end
             end
@@ -1584,11 +1590,14 @@ svc.WS.DescendantAdded:Connect(function(obj)
     end)
 end)
 
--- Watch for new parts inside models for items
+-- Also watch for new parts inside models for items
 svc.WS.DescendantAdded:Connect(function(obj)
     if not obj:IsA("BasePart") then return end
     if not ESP_CONFIG.Items then return end
-    if obj.Name ~= "BloxyCola" and obj.Name ~= "Medkit" then return end
+    local isItem = (obj.Name == "BloxyCola" or obj.Name == "Medkit"
+        or obj.Name == "BloxyCola_Model" or obj.Name == "Medkit_Model"
+        or obj.Name:lower():find("bloxycola") or obj.Name:lower():find("medkit"))
+    if not isItem then return end
     
     task.wait(0.5)
     local held = false
@@ -1605,10 +1614,14 @@ svc.WS.DescendantAdded:Connect(function(obj)
     end
     if not held then
         local parent = obj.Parent
-        if parent and parent:IsA("Model") and not parent:FindFirstChild("ESP_Item") then
-            AddESP(parent, "Item", _storedColors.ItemColor or ESP_CONFIG.ItemColor, false)
-        elseif not obj:FindFirstChild("ESP_Item") then
-            AddESP(obj, "Item", _storedColors.ItemColor or ESP_CONFIG.ItemColor, false)
+        if parent and parent:IsA("Model") then
+            if not EngineState.Pool[parent] and not parent:FindFirstChild("ESP_Item") then
+                AddESP(parent, "Item", GetItemColor(obj.Name), false)
+            end
+        else
+            if not EngineState.Pool[obj] and not obj:FindFirstChild("ESP_Item") then
+                AddESP(obj, "Item", GetItemColor(obj.Name), false)
+            end
         end
     end
 end)
@@ -1636,79 +1649,64 @@ secESP:Button({ Title="Refresh ESP", Callback=function() pcall(ScanAll) end })
 
 local secColors = tabVisual:Section({ Title = "ESP Colors", Opened = false })
 
--- FIXED: Color pickers now properly store and apply colors
-secColors:Colorpicker({ Title="Killer Color", Default=ESP_CONFIG.KillerColor, Transparency=0,
-    Callback=function(c) 
-        _storedColors.KillerColor = c
-        for obj, data in pairs(EngineState.Pool) do
+-- Refreshes colors on all existing ESP objects so pickers take effect immediately
+local function RefreshESPColors()
+    for obj, data in pairs(EngineState.Pool) do
+        pcall(function()
             if data.Tag == "Killer" then
-                if data.TextLabel then data.TextLabel.TextColor3 = c end
-                if data.Highlight then 
-                    data.Highlight.FillColor = c
-                    data.Highlight.OutlineColor = c
+                data.BaseColor = ESP_CONFIG.KillerColor
+                if data.TextLabel then data.TextLabel.TextColor3 = ESP_CONFIG.KillerColor end
+                if data.Highlight then
+                    data.Highlight.FillColor    = ESP_CONFIG.KillerColor
+                    data.Highlight.OutlineColor = ESP_CONFIG.KillerColor
+                end
+            elseif data.Tag == "Survivor" then
+                data.BaseColor = ESP_CONFIG.SurvivorColor
+                if data.Highlight then
+                    data.Highlight.FillColor    = ESP_CONFIG.SurvivorColor
+                    data.Highlight.OutlineColor = ESP_CONFIG.SurvivorColor
+                end
+                -- TextLabel color is health-based, leave it
+            elseif data.Tag == "Generator" then
+                data.BaseColor = ESP_CONFIG.GeneratorColor
+                if data.TextLabel then data.TextLabel.TextColor3 = ESP_CONFIG.GeneratorColor end
+                if data.Highlight then
+                    data.Highlight.FillColor    = ESP_CONFIG.GeneratorColor
+                    data.Highlight.OutlineColor = ESP_CONFIG.GeneratorColor
+                end
+            elseif data.Tag == "Item" then
+                -- Item colors depend on item name; re-derive if possible
+                if data.Highlight then
+                    data.Highlight.FillColor    = ESP_CONFIG.ItemColor
+                    data.Highlight.OutlineColor = ESP_CONFIG.ItemColor
+                end
+                if data.TextLabel then data.TextLabel.TextColor3 = ESP_CONFIG.ItemColor end
+            elseif data.Tag == "Building" then
+                data.BaseColor = ESP_CONFIG.BuildingColor
+                if data.TextLabel then data.TextLabel.TextColor3 = ESP_CONFIG.BuildingColor end
+                if data.Highlight then
+                    data.Highlight.FillColor    = ESP_CONFIG.BuildingColor
+                    data.Highlight.OutlineColor = ESP_CONFIG.BuildingColor
                 end
             end
-        end
-    end })
+        end)
+    end
+end
+
+secColors:Colorpicker({ Title="Killer Color", Default=ESP_CONFIG.KillerColor, Transparency=0,
+    Callback=function(c) ESP_CONFIG.KillerColor=c; RefreshESPColors() end })
 
 secColors:Colorpicker({ Title="Survivor Color", Default=ESP_CONFIG.SurvivorColor, Transparency=0,
-    Callback=function(c) 
-        _storedColors.SurvivorColor = c
-        for obj, data in pairs(EngineState.Pool) do
-            if data.Tag == "Survivor" then
-                if data.Highlight then 
-                    data.Highlight.FillColor = c
-                    data.Highlight.OutlineColor = c
-                end
-                data.BaseColor = c
-            end
-        end
-    end })
+    Callback=function(c) ESP_CONFIG.SurvivorColor=c; RefreshESPColors() end })
 
 secColors:Colorpicker({ Title="Generator Color", Default=ESP_CONFIG.GeneratorColor, Transparency=0,
-    Callback=function(c) 
-        _storedColors.GeneratorColor = c
-        for obj, data in pairs(EngineState.Pool) do
-            if data.Tag == "Generator" then
-                if data.TextLabel then data.TextLabel.TextColor3 = c end
-                if data.Highlight then 
-                    data.Highlight.FillColor = c
-                    data.Highlight.OutlineColor = c
-                end
-                data.BaseColor = c
-            end
-        end
-    end })
+    Callback=function(c) ESP_CONFIG.GeneratorColor=c; RefreshESPColors() end })
 
 secColors:Colorpicker({ Title="Item Color", Default=ESP_CONFIG.ItemColor, Transparency=0,
-    Callback=function(c) 
-        _storedColors.ItemColor = c
-        for obj, data in pairs(EngineState.Pool) do
-            if data.Tag == "Item" then
-                if data.TextLabel then data.TextLabel.TextColor3 = c end
-                if data.Highlight then 
-                    data.Highlight.FillColor = c
-                    data.Highlight.OutlineColor = c
-                end
-                data.BaseColor = c
-            end
-        end
-    end })
+    Callback=function(c) ESP_CONFIG.ItemColor=c; RefreshESPColors() end })
 
 secColors:Colorpicker({ Title="Building Color", Default=ESP_CONFIG.BuildingColor, Transparency=0,
-    Callback=function(c) 
-        _storedColors.BuildingColor = c
-        for obj, data in pairs(EngineState.Pool) do
-            if data.Tag == "Building" then
-                if data.TextLabel then data.TextLabel.TextColor3 = c end
-                if data.Highlight then 
-                    data.Highlight.FillColor = c
-                    data.Highlight.OutlineColor = c
-                end
-                data.BaseColor = c
-            end
-        end
-    end })
+    Callback=function(c) ESP_CONFIG.BuildingColor=c; RefreshESPColors() end })
 
 ------------------------------------------------------------------------
 -- Minion + Puddle ESP (Kept from original)
@@ -3105,7 +3103,7 @@ local aiState = {
     wpIndex     = 1,
     moveConn    = nil,
     lastMovePos = nil,
-    stuckCheck  = { pos = nil, time = 0 },
+    stuckCheck  = { pos = nil, time = 0 },  -- stuck detection
 }
 
 -----------------------------------------------------------------------
@@ -3156,6 +3154,7 @@ local function aiFireSlash()
         abilityName = "Punch"
         bufStr = "\x03\x05\x00\x00\x00Punch"
     else
+        -- Slasher, JohnDoe, 1x1x1x1, Nosferatu, Guest666, etc.
         abilityName = "Slash"
         bufStr = "\x03\x05\x00\x00\x00Slash"
     end
@@ -3169,7 +3168,7 @@ local function aiFireSlash()
 end
 
 -----------------------------------------------------------------------
--- KILLER AI — Movement Loop
+-- KILLER AI — Movement Loop (NEVER STOPS)
 -----------------------------------------------------------------------
 local function aiStartMove()
     if aiState.moveConn then aiState.moveConn:Disconnect() end
@@ -3184,6 +3183,7 @@ local function aiStartMove()
         local targetHRP = aiState.target.root
         if not targetHRP then return end
 
+        -- If very close, discard stale waypoints and track live position directly
         local directDist = (targetHRP.Position - hrp.Position).Magnitude
         if directDist <= 8 then
             aiState.waypoints   = {}
@@ -3193,6 +3193,7 @@ local function aiStartMove()
             return
         end
 
+        -- Follow waypoints
         if aiState.wpIndex <= #aiState.waypoints then
             local wp = aiState.waypoints[aiState.wpIndex]
             if (hrp.Position - wp.Position).Magnitude < 5 then
@@ -3202,6 +3203,7 @@ local function aiStartMove()
             return
         end
 
+        -- Direct chase with smooth lerp (ALWAYS ACTIVE, never stops)
         aiState.lastMovePos = aiState.lastMovePos or hrp.Position
         local targetPos = aiPredictPosition(targetHRP, aiCfg.predScale)
         aiState.lastMovePos = aiState.lastMovePos:Lerp(targetPos, 0.15)
@@ -3210,7 +3212,7 @@ local function aiStartMove()
 end
 
 -----------------------------------------------------------------------
--- KILLER AI — Main Loop
+-- KILLER AI — Main Loop (NEVER DIES)
 -----------------------------------------------------------------------
 local function aiKillerLoop()
     aiStartMove()
@@ -3225,6 +3227,7 @@ local function aiKillerLoop()
             task.wait(3); continue
         end
 
+        -- Stuck detection: if we haven't moved >2 studs in 1.5s, force repath
         local now = tick()
         if not aiState.stuckCheck.pos then
             aiState.stuckCheck.pos  = hrp.Position
@@ -3234,15 +3237,17 @@ local function aiKillerLoop()
             if moved < 2 and aiState.target and aiState.target.root then
                 local targetHRP = aiState.target.root
                 if (targetHRP.Position - hrp.Position).Magnitude > 8 then
+                    -- Stuck — clear waypoints to force a fresh path next tick
                     aiState.waypoints = {}
                     aiState.wpIndex   = 1
-                    aiState.lastPath  = 0
+                    aiState.lastPath  = 0  -- force immediate repath
                 end
             end
             aiState.stuckCheck.pos  = hrp.Position
             aiState.stuckCheck.time = now
         end
 
+        -- Retarget only if current target is dead/gone
         if not aiState.target or not aiState.target.root
             or aiState.target.humanoid.Health <= 0 then
             aiState.target    = aiGetNearest()
@@ -3253,6 +3258,7 @@ local function aiKillerLoop()
         if not aiState.target then continue end
         local targetHRP = aiState.target.root
 
+        -- Attack
         local dist = (targetHRP.Position - hrp.Position).Magnitude
         if dist <= aiCfg.slashRange then
             if tick() - aiState.lastSlash > aiCfg.slashCooldown then
@@ -3261,6 +3267,7 @@ local function aiKillerLoop()
             end
         end
 
+        -- Pathfinding (safe, refreshes every interval)
         if tick() - aiState.lastPath > aiCfg.pathInterval then
             aiState.lastPath = tick()
             local path = PathfindingService:CreatePath({
@@ -3273,11 +3280,12 @@ local function aiKillerLoop()
                 aiState.waypoints = path:GetWaypoints()
                 aiState.wpIndex   = 1
             else
-                aiState.waypoints = {}
+                aiState.waypoints = {} -- fallback: direct chase via Heartbeat
             end
         end
     end
 
+    -- Cleanup on stop
     if aiState.moveConn then aiState.moveConn:Disconnect(); aiState.moveConn = nil end
 end
 
@@ -3326,11 +3334,13 @@ secAICtrl:Button({
 })
 
 -- =========================================================================
--- GUEST 1337 SECTION - With Auto Block
+-- GUEST 1337 SECTION - WITH FIXED AUTO BLOCK (NO EXTRA RANGE)
 -- =========================================================================
 pcall(function()
 local tabGuest1337 = win:Tab({ Title = "Guest 1337", Icon = "shield", IconColor = Color3.fromHex("#FFD700"), ShowTabTitle = false })
 
+-- GUEST1337 — Auto Block & Combat
+------------------------------------------------------------------------
 local sec_015 = tabGuest1337:Section({ Title = "Auto Block & Combat", Opened = true })
 
 -- Settings
@@ -3356,12 +3366,13 @@ local combatS = {
     aimPunchDuration = 0.5,
     hbTargetSize    = Vector3.new(4.50, 6.00, 7.50),
     hbMargin        = 0.05,
-    autoBlockOn      = false,
-    autoBlockMode    = "Hitbox",
-    autoBlockAudioOn = false,
-    autoBlockAnimOn  = false,
+    autoBlockOn      = false,           -- MAIN AUTO BLOCK TOGGLE
+    autoBlockMode    = "Hitbox",        -- "Hitbox", "Sounds", "Animations"
+    autoBlockAudioOn = false,           -- kept for backward compat but controlled by mode
+    autoBlockAnimOn  = false,           -- kept for backward compat but controlled by mode
 }
 
+-- Block anim IDs for HDT detection
 local BLOCK_ANIMS = {
     ["72722244508749"]=true,["96959123077498"]=true,["95802026624883"]=true,
     ["100926346851492"]=true,["120748030255574"]=true,
@@ -3638,6 +3649,7 @@ local function combatAttemptSoundBlock(sound, preId)
     if not char:IsDescendantOf(kf) then return end
 
     local dist = (hrp.Position - myRoot.Position).Magnitude
+    -- FIX: Use exact detection range, NO extra +3
     if dist > combatS.detectionRange then return end
     if not combatIsFacing(myRoot, hrp, char.Name) then return end
 
@@ -3675,28 +3687,33 @@ local function combatHookSound(sound)
     if sound.IsPlaying then combatAttemptSoundBlock(sound, preId) end
 end
 
+-- FIXED: combatSetupSoundHooks now scans both killers folder AND workspace
 local function combatSetupSoundHooks()
     local kf = combatGetKillersFolder()
     if not kf then return end
     
+    -- Scan existing sounds in killers folder
     for _, d in ipairs(kf:GetDescendants()) do
         if d:IsA("Sound") then 
             pcall(combatHookSound, d) 
         end
     end
     
+    -- Watch for new sounds in killers folder
     kf.DescendantAdded:Connect(function(d)
         if d:IsA("Sound") then 
             pcall(combatHookSound, d) 
         end
     end)
     
+    -- Also scan workspace for sounds that might be outside killers folder
     for _, d in ipairs(svc.WS:GetDescendants()) do
         if d:IsA("Sound") and d:IsDescendantOf(combatGetKillersFolder()) then
             pcall(combatHookSound, d)
         end
     end
     
+    -- Watch workspace for new killer sounds
     svc.WS.DescendantAdded:Connect(function(d)
         if d:IsA("Sound") and d:IsDescendantOf(combatGetKillersFolder()) then
             pcall(combatHookSound, d)
@@ -3715,16 +3732,18 @@ local TRIGGER_ANIMS = {
     ["129976080405072"]=true,["121293883585738"]=true,["81639435858902"]=true,
     ["137314737492715"]=true,["92173139187970"]=true, ["122709416391"]=true,
     ["879895330952"]=true,
-    ["98031287364865"]=true, ["105614318732282"]=true,
-    ["127324570265084"]=true,
-    ["86710781315432"]=true, ["100725497418533"]=true,["106538427162796"]=true,
-    ["133398613783505"]=true,["87259391926321"]=true,
-    ["88451353906104"]=true,
-    ["135853087227453"]=true,
+    -- Added from M1 Animation Map
+    ["98031287364865"]=true, ["105614318732282"]=true, -- John Doe Punch
+    ["127324570265084"]=true,                           -- Slasher Slash
+    ["86710781315432"]=true, ["100725497418533"]=true,["106538427162796"]=true, -- Noli Stab
+    ["133398613783505"]=true,["87259391926321"]=true,  -- c00lkidd Punch
+    ["88451353906104"]=true,                            -- Nosferatu Slash
+    ["135853087227453"]=true,                           -- Guest 666 Slash
 }
 
 local combatAnimBlockConn = nil
 
+-- FIXED: combatSetupAnimBlock now uses Heartbeat instead of RenderStepped
 local function combatSetupAnimBlock()
     if combatAnimBlockConn then 
         combatAnimBlockConn:Disconnect() 
@@ -3749,6 +3768,7 @@ local function combatSetupAnimBlock()
             if not khrp or not khum then continue end
             
             local dist = (khrp.Position - myRoot.Position).Magnitude
+            -- FIX: Use exact detection range, NO extra
             if dist > combatS.detectionRange then continue end
             
             if not combatIsFacing(myRoot, khrp, killer.Name) then continue end
@@ -3789,6 +3809,11 @@ local function combatSetupAnimBlock()
             end
         end
     end)
+end
+
+-- FIX: combatGetDynamicRadius NOW RETURNS EXACT RANGE (NO PING EXTRA)
+local function combatGetDynamicRadius()
+    return combatS.detectionRange  -- EXACT range, no ping-based +3/+5/+10
 end
 
 local function combatTryBlockFromHitbox(hb)
@@ -3832,6 +3857,7 @@ local function combatTryBlockFromHitbox(hb)
 
     local myRoot = combatCachedHRP; if not myRoot then return end
     local dist = (hb.Position - myRoot.Position).Magnitude
+    -- FIX: Use exact detection range, NO extra from ping
     if dist > combatS.detectionRange then return end
 
     local hrp = killerModel:FindFirstChild("HumanoidRootPart")
@@ -3878,8 +3904,10 @@ end
 local combatHBChildConn    = nil
 local combatHBHeartbeatConn = nil
 
+-- FIXED: heartbeat loop uses EXACT detection range
 combatSetupSoundWatcher = function()
     task.spawn(function()
+        -- Initialize sound hooks first
         combatSetupSoundHooks()
         
         local folder = svc.WS:WaitForChild("Hitboxes", 10)
@@ -3899,6 +3927,7 @@ combatSetupSoundWatcher = function()
             if not combatS.autoBlockOn then return end
             if combatS.autoBlockMode ~= "Hitbox" then return end
             local myRoot = combatCachedHRP; if not myRoot then return end
+            -- FIX: Use EXACT detection range, NO extra
             local radius = combatS.detectionRange
             for _, hb in ipairs(folder:GetChildren()) do
                 if hb:IsA("BasePart") then
@@ -4189,6 +4218,7 @@ if lp.Character then
 end
 
 -- UI Elements
+-- MAIN AUTO BLOCK TOGGLE AT THE TOP
 sec_015:Toggle({ 
     Title = "🔒 Enable Auto Block", 
     Flag = "combatAutoBlockMain", 
@@ -4206,6 +4236,7 @@ sec_015:Toggle({
     Type = "Checkbox"
 })
 
+-- Auto Block Mode Dropdown (Hitbox, Sounds, Animations)
 sec_015:Dropdown({ 
     Title = "Auto Block Mode", 
     Flag = "combatAutoBlockMode", 
@@ -4284,7 +4315,8 @@ sec_019:Slider({ Title = "Punch Prediction", Flag = "combatPunchPred", Step = 0.
 sec_019:Slider({ Title = "Aim Duration (s)", Flag = "combatAimDur", Step = 0.05,
     Value = { Min = 0.1, Max = 2.0, Default = combatS.aimPunchDuration },
     Callback = function(v) combatS.aimPunchDuration = v end })
-end)
+end) -- END OF GUEST 1337 PCALL
+
 
 -- =========================================================================
 -- TAB: TWO-TIME (Dagger / Flank)
@@ -4515,7 +4547,7 @@ hookCrouch()
 
 -- Circle heartbeat
 svc.Run.Heartbeat:Connect(function() ttUpdateCircles() end)
-end)
+end) -- end Two-Time pcall
 
 -- TAB: INTERFACE
 ------------------------------------------------------------------------
@@ -4639,7 +4671,7 @@ secOldDevs:Paragraph({
     Title = "Special Thanks",
     Desc  = "Special thanks to glov/v1pr for the script.",
 })
-end)
+end) -- end Config Share + Credits pcall
 
 print("TEST 2")
 print("Hutao ready")
